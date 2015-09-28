@@ -138,16 +138,21 @@ public class IPluginManagerImpl extends IPluginManager.Stub {
 
     private void loadAllPlugin(Context context) {
         long b = System.currentTimeMillis();
-        ArrayList<File> apkfiles = new ArrayList<File>();
-        File baseDir = new File(PluginDirHelper.getBaseDir(context));
-        File[] dirs = baseDir.listFiles();
-        for (File dir : dirs) {
-            if (dir.isDirectory()) {
-                File file = new File(dir, "apk/base-1.apk");
-                if (file.exists()) {
-                    apkfiles.add(file);
+        ArrayList<File> apkfiles = null;
+        try {
+            apkfiles = new ArrayList<File>();
+            File baseDir = new File(PluginDirHelper.getBaseDir(context));
+            File[] dirs = baseDir.listFiles();
+            for (File dir : dirs) {
+                if (dir.isDirectory()) {
+                    File file = new File(dir, "apk/base-1.apk");
+                    if (file.exists()) {
+                        apkfiles.add(file);
+                    }
                 }
             }
+        } catch (Exception e) {
+            Log.e(TAG, "scan a apk file error %s", e);
         }
 
         Log.i(TAG, "Search apk cost %s ms", (System.currentTimeMillis() - b));
@@ -183,7 +188,7 @@ public class IPluginManagerImpl extends IPluginManager.Stub {
 
         try {
             mActivityManagerService.onCreate(IPluginManagerImpl.this);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "mActivityManagerService.onCreate", e);
         }
 
@@ -1274,10 +1279,14 @@ public class IPluginManagerImpl extends IPluginManager.Stub {
         List<RunningAppProcessInfo> infos = am.getRunningAppProcesses();
         boolean success = false;
         for (RunningAppProcessInfo info : infos) {
-            if (info.pkgList != null && Arrays.binarySearch(info.pkgList, pluginPackageName) >= 0 && info.pid != android.os.Process.myPid()) {
-                Log.i(TAG, "killBackgroundProcesses(%s),pkgList=%s,pid=%s", pluginPackageName, Arrays.toString(info.pkgList), info.pid);
-                android.os.Process.killProcess(info.pid);
-                success = true;
+            if (info.pkgList != null) {
+                String[] pkgListCopy = Arrays.copyOf(info.pkgList, info.pkgList.length);
+                Arrays.sort(pkgListCopy);
+                if (Arrays.binarySearch(pkgListCopy, pluginPackageName) >= 0 && info.pid != android.os.Process.myPid()) {
+                    Log.i(TAG, "killBackgroundProcesses(%s),pkgList=%s,pid=%s", pluginPackageName, Arrays.toString(info.pkgList), info.pid);
+                    android.os.Process.killProcess(info.pid);
+                    success = true;
+                }
             }
         }
         return success;
